@@ -26,7 +26,7 @@ class Lead extends Model
         return [
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
-            'phone_number' => 'required|max:20|regex:/^\+?[1-9]\d{1,14}$/',
+            'phone_number' => 'required|regex:/^\+[1-9]\d{1,14}$/',
         ];
     }
 }

@@ -23,34 +23,51 @@ class LeadImportService
             }
 
             $failedRows = $import->getFailedRows();
+            $successCount = $import->getSuccessCount();
             
             if ($failedRows->isEmpty()) {
                 return [
                     'success' => true,
-                    'message' => 'All leads imported successfully.',
-                    'error_report_path' => null
+                    'message' => $successCount . ' leads imported successfully.',
+                    'error_report_path' => null,
+                    'imported_count' => $successCount
                 ];
             }
 
             $errorReportPath = $this->generateErrorReport($failedRows);
 
             return [
-                'success' => false,
-                'message' => count($failedRows) . ' leads failed to import.',
-                'error_report_path' => $errorReportPath
+                'success' => $successCount > 0,
+                'message' => ($successCount > 0 ? $successCount . ' leads imported successfully. ' : '') . 
+                             count($failedRows) . ' leads failed to import.',
+                'error_report_path' => $errorReportPath,
+                'imported_count' => $successCount,
+                'failed_count' => count($failedRows)
             ];
         } catch (\Exception $e) {
+            \Log::error('Import exception: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
             throw $e;
         }
     }
 
     protected function generateErrorReport($failedRows)
     {
+        if ($failedRows->isEmpty()) {
+            return null;
+        }
+        
         $csv = Writer::createFromString('');
         
-        // Add headers
+        // Get the first failed row to determine structure
+        $firstRow = $failedRows->first();
+        
+        // Add headers - use the data keys as headers
         $headers = array_merge(
-            array_keys($failedRows->first()['row']),
+            array_keys($firstRow['data']),
             ['Validation Errors']
         );
         $csv->insertOne($headers);
@@ -58,7 +75,7 @@ class LeadImportService
         // Add rows
         foreach ($failedRows as $failedRow) {
             $row = array_merge(
-                array_values($failedRow['row']),
+                array_values($failedRow['data']), 
                 [implode(', ', $failedRow['errors'])]
             );
             $csv->insertOne($row);
